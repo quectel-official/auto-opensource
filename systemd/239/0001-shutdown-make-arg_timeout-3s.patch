@@ -1,0 +1,26 @@
+From 0cf2289d36347c39e4d4462fd92fd44f5189c169 Mon Sep 17 00:00:00 2001
+From: "solomon.cui" <solomon.cui@quectel.com>
+Date: Thu, 28 Oct 2021 19:14:14 +0800
+Subject: [PATCH 1/1] shutdown: make arg_timeout 3s
+
+Default arg_timeout is 90s, which looks like a little bit longer.
+Make it 3s, so that "remaining processes" wont block shutdown process.
+---
+ src/core/shutdown.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/core/shutdown.c b/src/core/shutdown.c
+index 038345b..7022dca 100644
+--- a/src/core/shutdown.c
++++ b/src/core/shutdown.c
+@@ -321,6 +321,8 @@ int main(int argc, char *argv[]) {
+ 
+         disable_coredumps();
+ 
++        /* Make it 3 seconds */
++        arg_timeout = (3 * USEC_PER_SEC);
+         log_info("Sending SIGTERM to remaining processes...");
+         broadcast_signal(SIGTERM, true, true, arg_timeout);
+ 
+-- 
+2.7.4
