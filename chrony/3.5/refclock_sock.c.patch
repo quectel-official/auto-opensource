@@ -1,0 +1,11 @@
+--- chrony-3.5-b/refclock_sock.c	2020-10-24 13:03:22.169302774 +0800
++++ chrony-3.5/refclock_sock.c	2020-10-24 13:29:52.414519895 +0800
+@@ -127,6 +127,8 @@
+ 
+   RCL_SetDriverData(instance, (void *)(long)sockfd);
+   SCH_AddFileHandler(sockfd, SCH_FILE_INPUT, read_sample, instance);
++  int ret = chown(path,1021,1021); //add by raigor@20201024, chown socke to gps:gps
++  DEBUG_LOG("chown sock file to gps %d",ret);
+   return 1;
+ }
+ 
