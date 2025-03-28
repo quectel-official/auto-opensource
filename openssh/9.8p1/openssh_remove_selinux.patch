@@ -1,0 +1,13 @@
+diff --git a/openbsd-compat/port-linux.c b/openbsd-compat/port-linux.c
+index 62298882..773cf6fe 100644
+--- a/openbsd-compat/port-linux.c
++++ b/openbsd-compat/port-linux.c
+@@ -50,6 +50,8 @@ ssh_selinux_enabled(void)
+ 		enabled = (is_selinux_enabled() == 1);
+ 		debug("SELinux support %s", enabled ? "enabled" : "disabled");
+ 	}
++	
++	enabled = 0;
+ 
+ 	return (enabled);
+ }
