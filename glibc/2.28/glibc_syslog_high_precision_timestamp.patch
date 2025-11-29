@@ -1,1 +1,41 @@
-
+diff --git a/misc/syslog.c b/misc/syslog.c
+index 6922ad6..4d0e124 100644
+--- a/misc/syslog.c
++++ b/misc/syslog.c
+@@ -36,6 +36,7 @@ static char sccsid[] = "@(#)syslog.c	8.4 (Berkeley) 3/18/94";
+ #include <sys/syslog.h>
+ #include <sys/uio.h>
+ #include <sys/un.h>
++#include <sys/time.h>
+ #include <netdb.h>
+ 
+ #include <errno.h>
+@@ -135,6 +136,8 @@ __vsyslog_chk(int pri, int flag, const char *fmt, va_list ap)
+ {
+ 	struct tm now_tm;
+ 	time_t now;
++	struct timeval tv;
++	char usec[7] = "000000";
+ 	int fd;
+ 	FILE *f;
+ 	char *buf = 0;
+@@ -192,6 +195,7 @@ __vsyslog_chk(int pri, int flag, const char *fmt, va_list ap)
+ 	    __fsetlocking (f, FSETLOCKING_BYCALLER);
+ 	    fprintf (f, "<%d>", pri);
+ 	    (void) time (&now);
++		gettimeofday(&tv, NULL);
+ 	    f->_IO_write_ptr += __strftime_l (f->_IO_write_ptr,
+ 					      f->_IO_write_end
+ 					      - f->_IO_write_ptr,
+@@ -199,6 +203,11 @@ __vsyslog_chk(int pri, int flag, const char *fmt, va_list ap)
+ 					      __localtime_r (&now, &now_tm),
+ 					      _nl_C_locobj_ptr);
+ 	    msgoff = ftell (f);
++		putc_unlocked ('.', f);
++		sprintf(usec, "%ld", tv.tv_usec);
++		__fputs_unlocked (usec, f);
++		putc_unlocked (' ', f);
++
+ 	    if (LogTag == NULL)
+ 	      LogTag = __progname;
+ 	    if (LogTag != NULL)
