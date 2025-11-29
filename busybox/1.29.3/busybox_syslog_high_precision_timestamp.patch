@@ -1,0 +1,13 @@
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 173b53b..d4ca11a 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -741,7 +741,7 @@ static void timestamp_and_log(int pri, char *msg, int len)
+ 	else {
+ 		char res[20];
+ 		parse_fac_prio_20(pri, res);
+-		sprintf(G.printbuf, "%s %.64s %s %s\n", timestamp, G.hostname, res, msg);
++		sprintf(G.printbuf, "%s%s\n", timestamp, msg);
+ 	}
+ 
+ 	/* Log message locally (to file or shared mem) */

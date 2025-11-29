@@ -1,0 +1,18 @@
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 3cf892b..12abb5d 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -836,7 +836,12 @@ static void timestamp_and_log(int pri, char *msg, int len)
+ 	}
+ 
+ 	if (option_mask32 & OPT_small)
+-		sprintf(G.printbuf, "%s %s\n", timestamp, msg);
++		if(msg[0] == '.') {
++			sprintf(G.printbuf, "%s%s\n", timestamp, msg);
++        }
++        else {
++            sprintf(G.printbuf, "%s %s\n", timestamp, msg);
++        }
+ 	else {
+ 		char res[20];
+ 		parse_fac_prio_20(pri, res);

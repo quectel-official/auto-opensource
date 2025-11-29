@@ -1,0 +1,285 @@
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 34a16b20..9b2878ce 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -218,6 +218,8 @@ typedef struct logFile_t {
+ 	unsigned size;
+ 	uint8_t isRegular;
+ #endif
++	char *cachebuf;
++	char *cachebuf_pos;
+ } logFile_t;
+ 
+ #if ENABLE_FEATURE_SYSLOGD_CFG
+@@ -281,6 +283,8 @@ struct globals {
+ 	 * host (64), fac.prio (20) to the message */
+ 	/* (growth by: 15 + 64 + 20 + delims = ~110) */
+ 	char printbuf[MAX_READ*2 + 128];
++
++	int logCacheSize;
+ };
+ 
+ static const struct init_globals init_data = {
+@@ -317,6 +321,7 @@ enum {
+ 	OPTBIT_nofork, // -n
+ 	OPTBIT_outfile, // -O
+ 	OPTBIT_loglevel, // -l
++	OPTBIT_cachesize, // -c
+ 	OPTBIT_small, // -S
+ 	IF_FEATURE_ROTATE_LOGFILE(OPTBIT_filesize   ,)	// -s
+ 	IF_FEATURE_ROTATE_LOGFILE(OPTBIT_rotatecnt  ,)	// -b
+@@ -331,6 +336,7 @@ enum {
+ 	OPT_nofork      = 1 << OPTBIT_nofork  ,
+ 	OPT_outfile     = 1 << OPTBIT_outfile ,
+ 	OPT_loglevel    = 1 << OPTBIT_loglevel,
++	OPT_cachesize   = 1 << OPTBIT_cachesize,
+ 	OPT_small       = 1 << OPTBIT_small   ,
+ 	OPT_filesize    = IF_FEATURE_ROTATE_LOGFILE((1 << OPTBIT_filesize   )) + 0,
+ 	OPT_rotatecnt   = IF_FEATURE_ROTATE_LOGFILE((1 << OPTBIT_rotatecnt  )) + 0,
+@@ -341,7 +347,7 @@ enum {
+ 	OPT_cfg         = IF_FEATURE_SYSLOGD_CFG(   (1 << OPTBIT_cfg        )) + 0,
+ 	OPT_kmsg        = IF_FEATURE_KMSG_SYSLOG(   (1 << OPTBIT_kmsg       )) + 0,
+ };
+-#define OPTION_STR "m:nO:l:S" \
++#define OPTION_STR "m:nO:l:c:S" \
+ 	IF_FEATURE_ROTATE_LOGFILE("s:" ) \
+ 	IF_FEATURE_ROTATE_LOGFILE("b:" ) \
+ 	IF_FEATURE_REMOTE_LOG(    "R:*") \
+@@ -350,12 +356,12 @@ enum {
+ 	IF_FEATURE_SYSLOGD_DUP(   "D"  ) \
+ 	IF_FEATURE_SYSLOGD_CFG(   "f:" ) \
+ 	IF_FEATURE_KMSG_SYSLOG(   "K"  )
+-#define OPTION_DECL *opt_m, *opt_l \
++#define OPTION_DECL *opt_m, *opt_l, *opt_c \
+ 	IF_FEATURE_ROTATE_LOGFILE(,*opt_s) \
+ 	IF_FEATURE_ROTATE_LOGFILE(,*opt_b) \
+ 	IF_FEATURE_IPC_SYSLOG(    ,*opt_C = NULL) \
+ 	IF_FEATURE_SYSLOGD_CFG(   ,*opt_f = NULL)
+-#define OPTION_PARAM &opt_m, &(G.logFile.path), &opt_l \
++#define OPTION_PARAM &opt_m, &(G.logFile.path), &opt_l, &opt_c \
+ 	IF_FEATURE_ROTATE_LOGFILE(,&opt_s) \
+ 	IF_FEATURE_ROTATE_LOGFILE(,&opt_b) \
+ 	IF_FEATURE_REMOTE_LOG(    ,&remoteAddrList) \
+@@ -680,12 +686,39 @@ static void log_to_kmsg(int pri UNUSED_PARAM, const char *msg UNUSED_PARAM) {}
+ #endif /* FEATURE_KMSG_SYSLOG */
+ 
+ /* Print a message to the log file. */
+-static void log_locally(time_t now, char *msg, logFile_t *log_file)
++static void log_locally(time_t now, char *msg, logFile_t *log_file, int flush)
+ {
+ #ifdef SYSLOGD_WRLOCK
+ 	struct flock fl;
+ #endif
+ 	int len = strlen(msg);
++	char *write_buf = msg;
++
++	/* Put the log into the cache first,
++	 * and then write the data to the file when the cache is full.
++	 */
++	if ((option_mask32 & OPT_cachesize) && log_file->cachebuf) {
++recheck:
++		if (len > 0)
++		{
++			int cp_len = log_file->cachebuf + G.logCacheSize - log_file->cachebuf_pos;
++
++			if (cp_len >= len) cp_len = len;
++			strncpy(log_file->cachebuf_pos, msg, cp_len);
++			log_file->cachebuf_pos += cp_len;
++			msg += cp_len;
++			len -= cp_len;
++		}
++
++		if(0 != flush || len > 0) {
++			write_buf = log_file->cachebuf;
++			len = log_file->cachebuf_pos - log_file->cachebuf;
++
++			log_file->cachebuf_pos = log_file->cachebuf;
++		} else {
++			return;
++		}
++	}
+ 
+ 	/* fd can't be 0 (we connect fd 0 to /dev/log socket) */
+ 	/* fd is 1 if "-O -" is in use */
+@@ -721,7 +754,7 @@ static void log_locally(time_t now, char *msg, logFile_t *log_file)
+ 				int fd = device_open(DEV_CONSOLE, O_WRONLY | O_NOCTTY | O_NONBLOCK);
+ 				if (fd < 0)
+ 					fd = 2; /* then stderr, dammit */
+-				full_write(fd, msg, len);
++				full_write(fd, write_buf, len);
+ 				if (fd != 2)
+ 					close(fd);
+ 				return;
+@@ -782,17 +815,23 @@ static void log_locally(time_t now, char *msg, logFile_t *log_file)
+ 		goto reopen;
+ 	}
+ /* TODO: what to do on write errors ("disk full")? */
+-	len = full_write(log_file->fd, msg, len);
++	len = full_write(log_file->fd, write_buf, len);
+ 	if (len > 0)
+ 		log_file->size += len;
+ #else
+-	full_write(log_file->fd, msg, len);
++	full_write(log_file->fd, write_buf, len);
+ #endif
+ 
+ #ifdef SYSLOGD_WRLOCK
+ 	fl.l_type = F_UNLCK;
+ 	fcntl(log_file->fd, F_SETLKW, &fl);
+ #endif
++
++	if ((option_mask32 & OPT_cachesize) && log_file->cachebuf) {
++		len = strlen(msg);
++		flush = 0;
++		goto recheck;
++	}
+ }
+ 
+ static void parse_fac_prio_20(int pri, char *res20)
+@@ -855,7 +894,7 @@ static void timestamp_and_log(int pri, char *msg, int len)
+ 
+ 		for (rule = G.log_rules; rule; rule = rule->next) {
+ 			if (rule->enabled_facility_priomap[facility] & prio_bit) {
+-				log_locally(now, G.printbuf, rule->file);
++				log_locally(now, G.printbuf, rule->file, 0);
+ 				match = 1;
+ 			}
+ 		}
+@@ -870,7 +909,7 @@ static void timestamp_and_log(int pri, char *msg, int len)
+ 			return;
+ 		}
+ #endif
+-		log_locally(now, G.printbuf, &G.logFile);
++		log_locally(now, G.printbuf, &G.logFile, 0);
+ 	}
+ }
+ 
+@@ -981,6 +1020,64 @@ static int try_to_resolve_remote(remoteHost_t *rh)
+ }
+ #endif
+ 
++static void cache_init()
++{
++	logRule_t *rule;
++
++	for (rule = G.log_rules; rule && rule->file; rule = rule->next) {
++		rule->file->cachebuf = NULL;
++		if (rule->file->path) {
++			if (G.logCacheSize >= 0x1000)
++				rule->file->cachebuf = malloc(G.logCacheSize);
++
++			if (DEBUG)
++				printf("--- %s Log Cache %d|%p\n", G.logFile.path, G.logCacheSize, G.logFile.cachebuf);
++		}
++		rule->file->cachebuf_pos = rule->file->cachebuf;
++	}
++
++	G.logFile.cachebuf = NULL;
++	if (G.logFile.path) {
++		if (G.logCacheSize >= 0x1000)
++			G.logFile.cachebuf = malloc(G.logCacheSize);
++
++		if (DEBUG)
++			printf("--- %s Log Cache %d|%p\n", G.logFile.path, G.logCacheSize, G.logFile.cachebuf);
++	}
++	G.logFile.cachebuf_pos = G.logFile.cachebuf;
++}
++
++static void cache_flush()
++{
++	time_t now;
++	logRule_t *rule;
++
++	time(&now);
++	log_locally(now, "", &G.logFile, 1);
++	for (rule = G.log_rules; rule && rule->file; rule = rule->next) {
++		log_locally(now, "", rule->file, 1);
++	}
++}
++
++static void cache_cleanup()
++{
++	logRule_t *rule;
++
++	if (G.logFile.cachebuf) {
++		free(G.logFile.cachebuf);
++		G.logFile.cachebuf = NULL;
++		G.logFile.cachebuf_pos = NULL;
++	}
++
++	for (rule = G.log_rules; rule && rule->file; rule = rule->next) {
++		if (rule->file->cachebuf) {
++			free(rule->file->cachebuf);
++			rule->file->cachebuf = NULL;
++			rule->file->cachebuf_pos = NULL;
++		}
++	}
++}
++
+ static void do_syslogd(void) NORETURN;
+ static void do_syslogd(void)
+ {
+@@ -996,6 +1093,7 @@ static void do_syslogd(void)
+ #endif
+ 
+ 	/* Set up signal handlers (so that they interrupt read()) */
++	signal_no_SA_RESTART_empty_mask(SIGUSR1, record_signo);
+ 	signal_no_SA_RESTART_empty_mask(SIGTERM, record_signo);
+ 	signal_no_SA_RESTART_empty_mask(SIGINT, record_signo);
+ 	//signal_no_SA_RESTART_empty_mask(SIGQUIT, record_signo);
+@@ -1012,8 +1110,12 @@ static void do_syslogd(void)
+ 	if (option_mask32 & OPT_kmsg)
+ 		kmsg_init();
+ 
++	if (option_mask32 & OPT_cachesize)
++		cache_init();
++
+ 	timestamp_and_log_internal("syslogd started: BusyBox v" BB_VER);
+ 
++retry:
+ 	while (!bb_got_signal) {
+ 		ssize_t sz;
+ 
+@@ -1095,7 +1197,24 @@ static void do_syslogd(void)
+ 		}
+ 	} /* while (!bb_got_signal) */
+ 
+-	timestamp_and_log_internal("syslogd exiting");
++	if (bb_got_signal == SIGUSR1)
++	{
++		if (option_mask32 & OPT_locallog)
++		{
++			timestamp_and_log_internal(" syslogd: flush the syslog cache.");
++			cache_flush();
++		}
++
++		bb_got_signal = 0;
++		goto retry;
++	}
++
++	timestamp_and_log_internal(" syslogd exiting");
++	if (option_mask32 & OPT_locallog) {
++		cache_flush();
++		cache_cleanup();
++	}
++
+ 	remove_pidfile(CONFIG_PID_FILE_PATH "/syslogd.pid");
+ 	ipcsyslog_cleanup();
+ 	if (option_mask32 & OPT_kmsg)
+@@ -1135,6 +1254,8 @@ int syslogd_main(int argc UNUSED_PARAM, char **argv)
+ 	//if (opts & OPT_outfile) // -O
+ 	if (opts & OPT_loglevel) // -l
+ 		G.logLevel = xatou_range(opt_l, 1, 8);
++	if (opts & OPT_cachesize) // -c
++		G.logCacheSize = xatoul_range(opt_c, 4, INT_MAX/1024) * 1024;
+ 	//if (opts & OPT_small) // -S
+ #if ENABLE_FEATURE_ROTATE_LOGFILE
+ 	if (opts & OPT_filesize) // -s
+@@ -1146,6 +1267,7 @@ int syslogd_main(int argc UNUSED_PARAM, char **argv)
+ 	if (opt_C) // -Cn
+ 		G.shm_size = xatoul_range(opt_C, 4, INT_MAX/1024) * 1024;
+ #endif
++
+ 	/* If they have not specified remote logging, then log locally */
+ 	if (ENABLE_FEATURE_REMOTE_LOG && !(opts & OPT_remotelog)) // -R
+ 		option_mask32 |= OPT_locallog;
