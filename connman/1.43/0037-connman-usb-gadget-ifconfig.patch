@@ -1,0 +1,15 @@
+diff --git a/plugins/gadget.c b/plugins/gadget.c
+index 2d58df3..778a0b0 100644
+--- a/plugins/gadget.c
++++ b/plugins/gadget.c
+@@ -271,6 +271,10 @@ static void gadget_tech_enable_tethering(struct connman_technology *technology,
+ 
+ 		connman_inet_add_to_bridge(index, bridge);
+ 
++		connman_inet_ifdown(index);
++
++		connman_inet_ifup(index);
++
+ 		gadget_tethering = true;
+ 	}
+ }
