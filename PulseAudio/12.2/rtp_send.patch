@@ -1,1 +1,68 @@
-
+diff --git a/src/modules/rtp/module-rtp-send.c b/src/modules/rtp/module-rtp-send.c
+index ceb6df5..f7b51cf 100644
+--- a/src/modules/rtp/module-rtp-send.c
++++ b/src/modules/rtp/module-rtp-send.c
+@@ -26,6 +26,7 @@
+ #include <netinet/in.h>
+ #include <errno.h>
+ #include <unistd.h>
++#include <net/if.h>
+ 
+ #include <pulse/rtclock.h>
+ #include <pulse/timeval.h>
+@@ -90,6 +91,7 @@ static const char* const valid_modargs[] = {
+     "loop",
+     "ttl",
+     "inhibit_auto_suspend",
++	"ifrname",
+     NULL
+ };
+ 
+@@ -226,10 +228,13 @@ int pa__init(pa_module*m) {
+     int r, j;
+     socklen_t k;
+     char hn[128], *n;
++	struct ifreq ifr;
++	const char *iface_name;
+     bool loop = false;
+     enum inhibit_auto_suspend inhibit_auto_suspend = INHIBIT_AUTO_SUSPEND_ONLY_WITH_NON_MONITOR_SOURCES;
+     const char *inhibit_auto_suspend_str;
+     pa_source_output_new_data data;
++	
+ 
+     pa_assert(m);
+ 
+@@ -302,6 +307,10 @@ int pa__init(pa_module*m) {
+ 
+     src_addr = pa_modargs_get_value(ma, "source_ip", DEFAULT_SOURCE_IP);
+ 
++	if (!(iface_name = pa_modargs_get_value(ma, "ifrname", NULL))) {
++        pa_log("ifrname does not exist.");
++        goto fail;
++    }
+     if (inet_pton(AF_INET, src_addr, &src_sa4.sin_addr) > 0) {
+         src_sa4.sin_family = af = AF_INET;
+         src_sa4.sin_port = htons(0);
+@@ -395,6 +404,7 @@ int pa__init(pa_module*m) {
+     }
+ 
+     j = loop;
++
+     if (setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, &j, sizeof(j)) < 0 ||
+         setsockopt(sap_fd, IPPROTO_IP, IP_MULTICAST_LOOP, &j, sizeof(j)) < 0) {
+         pa_log("IP_MULTICAST_LOOP failed: %s", pa_cstrerror(errno));
+@@ -414,7 +424,13 @@ int pa__init(pa_module*m) {
+             goto fail;
+         }
+     }
+-
++	
++	strncpy(ifr.ifr_name,iface_name,strlen(iface_name));
++	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof(ifr)) < 0 ||
++        setsockopt(sap_fd, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof(ifr)) < 0) {
++        pa_log("SO_BINDTODEVICE failed: %s", pa_cstrerror(errno));
++        goto fail;
++    }
+     /* If the socket queue is full, let's drop packets */
+     pa_make_fd_nonblock(fd);
+     pa_make_udp_socket_low_delay(fd);
