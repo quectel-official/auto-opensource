@@ -1,0 +1,84 @@
+diff --git a/src/network.c b/src/network.c
+index 416a7e7..44ebcd2 100644
+--- a/src/network.c
++++ b/src/network.c
+@@ -915,6 +915,7 @@ static void set_connected(struct connman_network *network)
+ {
+ 	struct connman_ipconfig *ipconfig_ipv4, *ipconfig_ipv6;
+ 	struct connman_service *service;
++	int ipv4_r = 0, ipv6_r = 0;
+ 
+ 	if (network->connected)
+ 		return;
+@@ -931,8 +932,12 @@ static void set_connected(struct connman_network *network)
+ 	DBG("service %p ipv4 %p ipv6 %p", service, ipconfig_ipv4,
+ 		ipconfig_ipv6);
+ 
+-	__connman_network_enable_ipconfig(network, ipconfig_ipv4);
+-	__connman_network_enable_ipconfig(network, ipconfig_ipv6);
++	ipv4_r = __connman_network_enable_ipconfig(network, ipconfig_ipv4);
++	ipv6_r = __connman_network_enable_ipconfig(network, ipconfig_ipv6);
++	if (ipv4_r < 0 && ipv6_r < 0)
++		connman_network_set_error(network,
++			CONNMAN_NETWORK_ERROR_CONFIGURE_FAIL);
++
+ }
+ 
+ static void set_disconnected(struct connman_network *network)
+@@ -1988,10 +1993,6 @@ int __connman_network_enable_ipconfig(struct connman_network *network,
+ 		break;
+ 	}
+ 
+-	if (r < 0)
+-		connman_network_set_error(network,
+-					CONNMAN_NETWORK_ERROR_CONFIGURE_FAIL);
+-
+ 	return r;
+ }
+ 
+diff --git a/src/service.c b/src/service.c
+index 805cfca..ee33041 100644
+--- a/src/service.c
++++ b/src/service.c
+@@ -6166,6 +6166,7 @@ static DBusMessage *set_property(DBusConnection *conn,
+ 	DBusMessageIter iter, value;
+ 	const char *name;
+ 	int type;
++	int r = 0;
+ 
+ 	DBG("service %p", service);
+ 
+@@ -6445,11 +6446,14 @@ static DBusMessage *set_property(DBusConnection *conn,
+ 		if (err < 0) {
+ 			if (is_connected(state) || is_connecting(state)) {
+ 				if (type == CONNMAN_IPCONFIG_TYPE_IPV4)
+-					__connman_network_enable_ipconfig(service->network,
++					r = __connman_network_enable_ipconfig(service->network,
+ 							service->ipconfig_ipv4);
+ 				else
+-					__connman_network_enable_ipconfig(service->network,
++					r = __connman_network_enable_ipconfig(service->network,
+ 							service->ipconfig_ipv6);
++				if (r < 0)
++					connman_network_set_error(service->network,
++						CONNMAN_NETWORK_ERROR_CONFIGURE_FAIL);
+ 			}
+ 
+ 			return __connman_error_failed(msg, -err);
+@@ -6463,11 +6467,14 @@ static DBusMessage *set_property(DBusConnection *conn,
+ 		if (is_connecting(service->state) ||
+ 				is_connected(service->state)) {
+ 			if (type == CONNMAN_IPCONFIG_TYPE_IPV4)
+-				__connman_network_enable_ipconfig(service->network,
++				r = __connman_network_enable_ipconfig(service->network,
+ 								service->ipconfig_ipv4);
+ 			else
+-				__connman_network_enable_ipconfig(service->network,
++				r = __connman_network_enable_ipconfig(service->network,
+ 								service->ipconfig_ipv6);
++			if (r < 0)
++				connman_network_set_error(service->network,
++					CONNMAN_NETWORK_ERROR_CONFIGURE_FAIL);
+ 		}
+ 
+ 		service_save(service);
