@@ -1,1 +1,35 @@
-
+diff -Naur chrony-4.2/ntp_core.c chrony-4.2/ntp_core.c
+--- chrony-4.2/ntp_core.c	2024-07-05 15:10:58.963408598 +0800
++++ chrony-4.2/ntp_core.c	2024-07-06 12:46:17.168710886 +0800
+@@ -1211,6 +1211,8 @@
+     LCL_ReadCookedTime(&local_transmit, &local_transmit_err);
+ 
+   ret = NIO_SendPacket(&message, where_to, from, info.length, local_tx != NULL);
++  LOG(LOGS_INFO, "[quectel debug] ntp sendpacket from %s to %s time %x.%x (%s)", \
++		  UTI_IPToString(&from->ip_addr),UTI_IPToString(&where_to->ip_addr),message.transmit_ts.hi,message.transmit_ts.lo,UTI_Ntp64ToString(&message.transmit_ts));
+ 
+   if (local_tx) {
+     if (smooth_time)
+diff -Naur chrony-4.2/ntp_io.c chrony-4.2/ntp_io.c
+--- chrony-4.2/ntp_io.c	2021-12-16 20:17:42.000000000 +0800
++++ chrony-4.2/ntp_io.c	2024-07-06 12:55:24.879815604 +0800
+@@ -301,6 +301,7 @@
+ int
+ NIO_OpenServerSocket(NTP_Remote_Address *remote_addr)
+ {
++  int opt = 5;
+   switch (remote_addr->ip_addr.family) {
+     case IPADDR_INET4:
+       if (ptp_port > 0 && remote_addr->port == ptp_port)
+@@ -309,6 +310,11 @@
+         return server_sock_fd4;
+       if (server_sock_fd4 == INVALID_SOCK_FD)
+         server_sock_fd4 = open_socket(IPADDR_INET4, CNF_GetNTPPort(), 0, NULL);
++        if (setsockopt(server_sock_fd4 , SOL_SOCKET , SO_PRIORITY , &opt , sizeof(opt)) < 0)
++        {
++          LOG(LOGS_ERR, "Could not set %s socket option", "SO_PRIORITY");
++        }
++        LOG(LOGS_INFO, "set %s socket option success", "SO_PRIORITY");
+       if (server_sock_fd4 != INVALID_SOCK_FD)
+         server_sock_ref4++;
+       return server_sock_fd4;
