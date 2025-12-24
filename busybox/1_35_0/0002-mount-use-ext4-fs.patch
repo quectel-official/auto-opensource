@@ -1,0 +1,21 @@
+diff --git a/automountsdcard.sh b/automountsdcard.sh
+index efae5f8..ebdcaa3 100644
+--- a/automountsdcard.sh
++++ b/automountsdcard.sh
+@@ -41,6 +41,7 @@ umount_partition()
+ 
+ mount_partition()
+ {
++	fsck.ext4 -y /dev/$1
+         check_mount_point $1
+         if [ ! -d "${destdir}" ]; then
+             mkdir "${destdir}"
+@@ -48,7 +49,7 @@ mount_partition()
+ 
+ # Mounting sd-card with user "root" and group "sdcard" with proper umask permissions so that non-root applications can access sdcard by adding to "sdcard" group. 
+ 
+-        if ! mount -t auto "/dev/$1" "${destdir}" -o uid=0,gid=1015,umask=002,context=system_u:object_r:sdcard_t:s0,nodev,noexec,nosuid; then
++        if ! mount -t ext4 "/dev/$1" "${destdir}" -o context=system_u:object_r:sdcard_t:s0,nodev,noexec,nosuid; then
+                 # failed to mount
+                 exit 1
+         fi

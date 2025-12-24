@@ -1,1 +1,15 @@
-
+diff --git a/automountsdcard.sh b/automountsdcard.sh
+index b6726f8..efae5f8 100644
+--- a/automountsdcard.sh
++++ b/automountsdcard.sh
+@@ -123,6 +123,10 @@ check_umount_point()
+ 
+ case "${ACTION}" in
+ add|"")
++        if [ $# -gt 1 ]
++        then
++            destdir=$2
++        fi
+         result=`check_if_boot_dev $1`
+         if [ $result -eq 1 ]; then
+                  create_symlink $1 &
