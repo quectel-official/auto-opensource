@@ -1,0 +1,38 @@
+diff --git a/main.c b/main.c
+index 8edb2e1..35cdb3c 100644
+--- a/main.c
++++ b/main.c
+@@ -550,8 +550,10 @@
+     }
+   }
+
++#if 0
+   if (user_check && getuid() != 0)
+     LOG_FATAL("Not superuser");
++#endif
+
+   /* Turn into a daemon */
+   if (!nofork) {
+@@ -593,8 +595,10 @@
+     user = CNF_GetUser();
+
+   pw = getpwnam(user);
++#if 0
+   if (!pw)
+     LOG_FATAL("Could not get user/group ID of %s", user);
++#endif
+
+   /* Create directories for sockets, log files, and dump files */
+   CNF_CreateDirs(pw->pw_uid, pw->pw_gid);
+@@ -634,9 +638,11 @@
+     SYS_LockMemory();
+   }
+
++#if 0
+   /* Drop root privileges if the specified user has a non-zero UID */
+   if (!geteuid() && (pw->pw_uid || pw->pw_gid))
+     SYS_DropRoot(pw->pw_uid, pw->pw_gid, SYS_MAIN_PROCESS);
++#endif
+
+   if (!geteuid())
+     LOG(LOGS_WARN, "Running with root privileges");
