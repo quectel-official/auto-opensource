@@ -1,0 +1,133 @@
+diff -uprN git.org/include/libubi.h git/include/libubi.h
+--- git.org/include/libubi.h	2019-06-06 00:30:34.605559000 +0800
++++ git/include/libubi.h	2019-06-05 16:25:24.306080000 +0800
+@@ -32,6 +32,14 @@
+ extern "C" {
+ #endif
+ 
++
++//Quectel add 20190518
++/*****************************************************************************************************************
++Ramos.zhang-2019/05/18: Resolve find_paritions.sh make usrdata(or data) partition format even they good sometimes
++Refer to [Issue-Depot].[IS0000570][Submitter:ramos.zhang,Date:2019-05-18]
++*******************************************************************************************************************/
++#define QUECTEL_UBITOOL_OPTIMIZE
++
+ /* UBI version libubi is made for */
+ #define LIBUBI_UBI_VERSION 1
+ 
+@@ -174,6 +182,15 @@ struct ubi_vol_info
+ 	char name[UBI_VOL_NAME_MAX + 1];
+ };
+ 
++#ifdef QUECTEL_UBITOOL_OPTIMIZE
++/*****************************************************************************************************************
++Ramos.zhang-2019/05/18: Resolve find_paritions.sh make usrdata(or data) partition format even they good sometimes
++Refer to [Issue-Depot].[IS0000570][Submitter:ramos.zhang,Date:2019-05-18]
++*******************************************************************************************************************/
++void Quectel_WaitUbiDevNodeCreate( int ubi_dev_num);
++void Quectel_WaitUbiVolumDevNodeCreate( int ubi_dev_num, int ubi_vol_id);
++#endif
++
+ /**
+  * libubi_open - open UBI library.
+  *
+diff -uprN git.org/lib/libubi.c git/lib/libubi.c
+--- git.org/lib/libubi.c	2019-06-06 00:30:34.609559000 +0800
++++ git/lib/libubi.c	2019-06-05 16:23:29.674082000 +0800
+@@ -36,6 +36,54 @@
+ #include "libubi_int.h"
+ #include "common.h"
+ 
++#ifdef QUECTEL_UBITOOL_OPTIMIZE
++/*****************************************************************************************************************
++Ramos.zhang-2019/05/18: Resolve find_paritions.sh make usrdata(or data) partition format even they good sometimes
++Refer to [Issue-Depot].[IS0000570][Submitter:ramos.zhang,Date:2019-05-18]
++*******************************************************************************************************************/
++//Quectel add start
++//Ramos.zhang-20190518 add for wait new /dev/ubi*  generate
++#define UBI_DEVICE_DEV  "/dev/ubi%d"
++#define UBI_VOLUME_DEVICE_DEV  "/dev/ubi%d_%d"
++
++void Quectel_WaitUbiDevNodeCreate( int ubi_dev_num)
++{
++	int i;
++	struct stat st;
++	char file[strlen(UBI_DEVICE_DEV) + 10];
++	sprintf(file, UBI_DEVICE_DEV, ubi_dev_num);
++	
++	for(i = 0; i < 200; i++)// wait  2s  time out
++	{
++		if (!stat(file, &st))
++			return ;
++		//printf("ubiattch wait ubi dev times =%d \n",i);
++		usleep(10000);// sleep 10ms
++	}
++	// time out
++	return;
++}
++
++void Quectel_WaitUbiVolumDevNodeCreate( int ubi_dev_num, int ubi_vol_id)
++{
++	int i;
++	struct stat st;
++	char file[strlen(UBI_VOLUME_DEVICE_DEV ) + 10];
++	sprintf(file, UBI_VOLUME_DEVICE_DEV , ubi_dev_num,ubi_vol_id);
++	
++	for(i = 0; i < 200; i++)// wait  2s  time out
++	{
++		if (!stat(file, &st))
++			return ;
++		//printf("ubiattch wait ubi volume tiems=%d \n",i);
++		usleep(10000);// sleep 10ms
++	}
++	// time out
++	return;
++}
++//Quectel add end
++#endif
++
+ /**
+  * mkpath - compose full path from 2 given components.
+  * @path: the first component
+diff -uprN git.org/ubi-utils/ubiattach.c git/ubi-utils/ubiattach.c
+--- git.org/ubi-utils/ubiattach.c	2019-06-06 00:30:34.613559000 +0800
++++ git/ubi-utils/ubiattach.c	2019-06-05 16:20:47.886085000 +0800
+@@ -244,6 +244,18 @@ int main(int argc, char * const argv[])
+ 	util_print_bytes(dev_info.leb_size, 1);
+ 	printf("\n");
+ 
++#ifdef QUECTEL_UBITOOL_OPTIMIZE
++/*****************************************************************************************************************
++Ramos.zhang-2019/05/18: Resolve find_paritions.sh make usrdata(or data) partition format even they good sometimes
++Refer to [Issue-Depot].[IS0000570][Submitter:ramos.zhang,Date:2019-05-18]
++*******************************************************************************************************************/
++	//printf("Quectel0125 ubiattach wait /dev/ubi cdev before return \n");
++	Quectel_WaitUbiDevNodeCreate(dev_info.dev_num);
++#else
++	//printf("Quectel0125 add mdev -s before ubiattch return \n");
++	//system("mdev -s");//Quectel add for test
++#endif
++
+ 	libubi_close(libubi);
+ 	return 0;
+ 
+diff -uprN git.org/ubi-utils/ubimkvol.c git/ubi-utils/ubimkvol.c
+--- git.org/ubi-utils/ubimkvol.c	2019-06-06 00:30:34.613559000 +0800
++++ git/ubi-utils/ubimkvol.c	2019-06-05 16:20:12.782086000 +0800
+@@ -289,6 +289,15 @@ int main(int argc, char * const argv[])
+ 	       req.vol_type == UBI_DYNAMIC_VOLUME ? "dynamic" : "static",
+ 	       vol_info.name, vol_info.alignment);
+ 
++#ifdef QUECTEL_UBITOOL_OPTIMIZE
++/*****************************************************************************************************************
++Ramos.zhang-2019/05/18: Resolve find_paritions.sh make usrdata(or data) partition format even they good sometimes
++Refer to [Issue-Depot].[IS0000570][Submitter:ramos.zhang,Date:2019-05-18]
++*******************************************************************************************************************/
++	//printf("Quectel0125 add wait ubi voluem %d,%d \n",dev_info.dev_num,vol_info.vol_id);
++	Quectel_WaitUbiVolumDevNodeCreate(dev_info.dev_num,vol_info.vol_id);
++#endif
++
+ 	libubi_close(libubi);
+ 	return 0;
+ 
