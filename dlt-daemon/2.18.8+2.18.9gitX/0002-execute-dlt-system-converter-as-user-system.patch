@@ -1,1 +1,44 @@
 
+diff --git a/systemd/dlt-system.service.cmake b/systemd/dlt-system.service.cmake
+index 0e91f42..1a5b913 100755
+--- a/systemd/dlt-system.service.cmake
++++ b/systemd/dlt-system.service.cmake
+@@ -20,11 +20,17 @@
+ 
+ [Service]
+ Type=simple
++User=system
++Group=system
+ ExecStart=@CMAKE_INSTALL_PREFIX@/bin/dlt-system
+ WatchdogSec=@DLT_WatchdogSec@
+ NotifyAccess=main
+ LimitCORE=infinity
+ 
++SupplementaryGroups=diag inet net_admin system netdev net_raw kmsg
++CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SETUID CAP_SETGID CAP_DAC_OVERRIDE
++AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SETUID CAP_SETGID CAP_DAC_OVERRIDE
++
+ [Install]
+ WantedBy=basic.target
+ 
+diff --git a/systemd/dlt.service.cmake b/systemd/dlt.service.cmake
+index 0b3ee2c..e4753a2 100755
+--- a/systemd/dlt.service.cmake
++++ b/systemd/dlt.service.cmake
+@@ -19,10 +19,16 @@
+ 
+ [Service]
+ Type=simple
++User=system
++Group=system
+ ExecStart=@CMAKE_INSTALL_PREFIX@/bin/dlt-daemon
+ WatchdogSec=@DLT_WatchdogSec@
+ NotifyAccess=main
+ LimitCORE=infinity
+ 
++SupplementaryGroups=net_raw
++CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
++AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
++
+ [Install]
+ WantedBy=basic.target
