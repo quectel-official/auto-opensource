@@ -1,1 +1,22 @@
+From: Darren.Li <darren.li@quectel.com>
+Date: Thur, 28 June 2018 15:31:40 -0600
+Subject: [PATCH] veritysetup tools have a open ubiblock bug,
+fix it
 
+Upstream-Status: Submitted
+
+This patch for DM verity
+---
+
+diff -ur a/lib/utils_device.c b/lib/utils_device.c
+--- a/lib/utils_device.c	2017-03-12 20:20:39.000000000 +0800
++++ b/lib/utils_device.c	2018-06-28 15:45:31.142126130 +0800
+@@ -382,7 +382,7 @@
+ 	/* Try to open read-write to check whether it is a read-only device */
+ 	/* coverity[toctou] */
+ 	fd = open(device->path, O_RDWR | flags);
+-	if (fd == -1 && errno == EROFS) {
++	if (fd == -1 && (errno == EROFS || errno == EPERM)) {
+ 		*readonly = 1;
+ 		fd = open(device->path, O_RDONLY | flags);
+ 	}
