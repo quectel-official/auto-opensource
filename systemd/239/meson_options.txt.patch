@@ -1,0 +1,12 @@
+--- git_b/meson_options.txt	2021-04-08 18:45:08.255803811 +0800
++++ git/meson_options.txt	2021-04-08 18:47:28.058170143 +0800
+@@ -147,7 +147,8 @@
+ option('default-hierarchy', type : 'combo',
+        choices : ['legacy', 'hybrid', 'unified'], value : 'hybrid',
+        description : 'default cgroup hierarchy')
+-option('time-epoch', type : 'string',
++#modify by raigor@20210408 ,set system time 1970-01-01
++option('time-epoch', type : 'string', value : '0',
+        description : 'time epoch for time clients')
+ option('system-uid-max', type : 'string',
+        description : 'maximum system UID')
