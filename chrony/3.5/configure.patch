@@ -1,0 +1,13 @@
+diff --git a/configure b/configure
+index 323f574..0f8934b 100755
+--- a/configure
++++ b/configure
+@@ -229,7 +229,7 @@ try_timestamping=0
+ feat_ntp_signd=0
+ ntp_era_split=""
+ use_pthread=0
+-default_user="root"
++default_user="system"
+ default_hwclockfile=""
+ default_pidfile="/var/run/chrony/chronyd.pid"
+ default_rtcdevice="/dev/rtc"
