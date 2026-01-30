@@ -1,0 +1,43 @@
+diff -uprN a/sysklogd/klogd.c b/sysklogd/klogd.c
+--- a/sysklogd/klogd.c	2018-07-02 19:23:06.000000000 +0800
++++ b/sysklogd/klogd.c	2020-11-09 09:13:54.000000000 +0800
+@@ -173,6 +173,7 @@ int klogd_main(int argc UNUSED_PARAM, ch
+ 	char *opt_c;
+ 	int opt;
+ 	int used;
++	int try_count = 0;
+ 
+ 	setup_common_bufsiz();
+ 
+@@ -187,6 +188,19 @@ int klogd_main(int argc UNUSED_PARAM, ch
+ 
+ 	logmode = LOGMODE_SYSLOG;
+ 
++	while (try_count < 20) {
++		if (!access("/tmp/syslog_dev_log.ready", F_OK)) {
++			FILE *_fp = fopen("/tmp/syslog_dev_log.ready", "w");
++			if (_fp) {
++			 fprintf(_fp, "tried %d times, %dms\n", try_count, try_count*100);
++			 fclose(_fp);
++			}
++			break;
++		}
++		usleep(100000);
++		try_count++;
++	}
++
+ 	/* klogd_open() before openlog(), since it might use fixed fd 3,
+ 	 * and openlog() also may use the same fd 3 if we swap them:
+ 	 */
+diff -uprN a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+--- a/sysklogd/syslogd.c	2018-07-02 19:23:06.000000000 +0800
++++ b/sysklogd/syslogd.c	2020-10-13 14:24:58.000000000 +0800
+@@ -998,6 +998,8 @@ static void do_syslogd(void)
+ 	alarm(G.markInterval);
+ #endif
+ 	xmove_fd(create_socket(), STDIN_FILENO);
++	FILE *_fp = fopen("/tmp/syslog_dev_log.ready", "w");
++	if (_fp) fclose(_fp);
+ 
+ 	if (option_mask32 & OPT_circularlog)
+ 		ipcsyslog_init();
