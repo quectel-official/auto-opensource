@@ -1,0 +1,117 @@
+--- a/xattr.c	2020-04-14 13:09:41.242688000 +0800
++++ b/xattr.c	2020-04-14 16:08:27.183791709 +0800
+@@ -47,7 +47,10 @@
+ #include "xattr.h"
+ #include "error.h"
+ #include "progressbar.h"
+-
++/*header file for selinux*/
++#include <selinux/selinux.h> //add for selinux
++#include <selinux/label.h> //add for selinux
++#define XATTR_NAME_SELINUX "security.selinux" //xattr for security selinux
+ #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+ 
+ /* compressed xattr table */
+@@ -84,7 +87,9 @@
+ extern int fd;
+ extern unsigned int xattr_bytes, total_xattr_bytes;
+ extern char *context_file;
+-
++extern char *selinux_file;
++extern char **source_path;
++extern struct selabel_handle *sehnd;
+ /* helper functions from mksquashfs.c */
+ extern unsigned short get_checksum(char *, int, unsigned short);
+ extern void write_destination(int, long long, int, void *);
+@@ -120,8 +125,6 @@
+ 
+ #ifdef WITH_SELINUX
+ 
+-static struct selabel_handle *sehnd = NULL;
+-
+ struct selabel_handle *get_sehnd(const char *context_file) {
+     struct selinux_opt seopts[] = {
+         {
+@@ -164,7 +167,7 @@
+ }
+ 
+ 	
+-static int read_xattrs_from_context_file(char *filename, int mode,
++/*static int read_xattrs_from_context_file(char *filename, int mode,
+ 	struct selabel_handle *sehnd, struct xattr_list **xattrs)
+ {
+ 	char *attr_val;
+@@ -178,7 +181,7 @@
+ 	x->vsize = strlen(attr_val);
+ 	*xattrs = x;
+ 	return 1;
+-}
++}*/
+ #endif
+ 
+ static int read_xattrs_from_system(char *filename, struct xattr_list **xattrs)
+@@ -671,7 +674,23 @@
+ 	 */
+ 	return get_xattr_id(xattrs, xattr_list, xattr_disk, xattr_dupl);
+ }
+-
++static int generate_selinux_xattr(struct xattr_list *xattr, const char *filename, const char *sepath)
++{
++    struct stat st;
++    char *secontext = NULL;
++    if (stat(filename, &st)) {
++        ERROR("Can't get %s stat\n", filename);
++        exit(1);
++    }
++    if (sehnd != NULL) {
++        if (selabel_lookup(sehnd, &secontext, sepath, st.st_mode) < 0) {
++            secontext = strdup("u:object_r:default_t");
++        }
++    }
++    xattr->type = get_prefix(xattr, XATTR_NAME_SELINUX);
++    xattr->vsize = strlen(secontext) + 1;
++    xattr->value = strdup(secontext);
++}
+ 
+ extern char *subpathname(struct dir_ent *dir_ent);
+ int read_xattrs(void *d)
+@@ -682,26 +701,25 @@
+ 	char *subpath = subpathname(dir_ent);
+ 	struct xattr_list *xattr_list;
+ 	int xattrs;
+-
++	int ret;
++	char *sepath = strdup(filename+strlen(source_path[0]));
+ 	if(no_xattrs || IS_PSEUDO(inode) || inode->root_entry)
+ 		return SQUASHFS_INVALID_XATTR;
+ 
+-#ifdef WITH_SELINUX
+-	if (context_file) {
+-		if (sehnd == NULL)
+-			sehnd = get_sehnd(context_file);
+-		xattrs = read_xattrs_from_context_file(subpath, inode->buf.st_mode,
+-				sehnd, &xattr_list);
+-	} else {
+-		xattrs = read_xattrs_from_system(filename, &xattr_list);
+-	}
+-#else
+-		xattrs = read_xattrs_from_system(filename, &xattr_list);
+-#endif
++    if (sehnd == NULL) {
++	    xattrs = read_xattrs_from_system(filename, &xattr_list);
++    } else {
++        xattrs = 1;
++        xattr_list = malloc(xattrs*sizeof(struct xattr_list));
++        generate_selinux_xattr(&xattr_list[xattrs-1], selinux_file, sepath);
++    }
+ 	if(xattrs == 0)
+ 		return SQUASHFS_INVALID_XATTR;
+ 
+-	return generate_xattrs(xattrs, xattr_list);
++	ret = generate_xattrs(xattrs, xattr_list);
++        TRACE("%s: file:%s full_name:%s val:%s xattr_id: %d\n", 
++        __func__, sepath, xattr_list[xattrs-1].full_name, xattr_list[xattrs-1].value, ret);
++	return ret;
+ }
+ 
+ 

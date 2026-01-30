@@ -1,0 +1,63 @@
+--- a/mksquashfs.c	2020-04-14 13:09:41.242688000 +0800
++++ b/mksquashfs.c	2020-04-14 15:44:24.211791709 +0800
+@@ -50,6 +50,8 @@
+ #include <sys/wait.h>
+ #include <limits.h>
+ #include <ctype.h>
++#include <selinux/selinux.h> //add for selinux
++#include <selinux/label.h> //add for selinux
+ 
+ #ifndef linux
+ #define __BYTE_ORDER BYTE_ORDER
+@@ -99,6 +101,9 @@
+ int use_regex = FALSE;
+ int nopad = FALSE;
+ int exit_on_error = FALSE;
++/* global var for selinux */
++char *selinux_file = NULL;
++struct selabel_handle *sehnd = NULL;
+ 
+ long long global_uid = -1, global_gid = -1;
+ 
+@@ -5561,7 +5566,22 @@
+ 				exit(1);
+ 			}	
+ 			root_name = argv[i];
+-		} else if(strcmp(argv[i], "-version") == 0) {
++	       } else if (strcmp(argv[i], "-selinux") == 0) {
++            		struct stat context_st;
++            		if (++i == argc) {
++                	ERROR("%s: -selinux: missing name\n", argv[0]);
++				exit(1);
++            		}
++            		selinux_file = strdup(argv[i]);
++            		if (stat(selinux_file, &context_st)) {
++                		ERROR("can't get %s file stat\n", selinux_file);
++                		exit(1);
++            		}
++            		struct selinux_opt seopt[] = {
++                	{ SELABEL_OPT_PATH, selinux_file }
++            		};
++            		sehnd = selabel_open(SELABEL_CTX_FILE, seopt, 1);
++        	} else if(strcmp(argv[i], "-version") == 0) {
+ 			VERSION();
+ 		} else {
+ 			ERROR("%s: invalid option\n\n", argv[0]);
+@@ -5634,6 +5654,8 @@
+ 			ERROR("\t\t\tcalled <name>, rather than adding the new "
+ 				"source items\n");
+ 			ERROR("\t\t\tto the original root\n");
++			ERROR("-selinux <file_ctx>\tadd selinux file "
++				"for squashfs\n");
+ 			ERROR("\nMksquashfs runtime options:\n");
+ 			ERROR("-version\t\tprint version, licence and "
+ 				"copyright message\n");
+@@ -6033,6 +6055,7 @@
+ 
+ 	set_progressbar_state(FALSE);
+ 	write_filesystem_tables(&sBlk, nopad);
+-
++	if (sehnd != NULL)
++        selabel_close(sehnd);
+ 	return 0;
+ }

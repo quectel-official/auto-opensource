@@ -1,1 +1,11 @@
-
+diff -u a/Makefile b/Makefile
+--- a/Makefile	2018-08-10 14:46:45.923782000 +0800
++++ b/Makefile	2018-08-11 18:22:55.010588000 +0800
+@@ -127,7 +127,7 @@
+ CFLAGS += -DGZIP_SUPPORT
+ MKSQUASHFS_OBJS += gzip_wrapper.o
+ UNSQUASHFS_OBJS += gzip_wrapper.o
+-LIBS += -lz
++LIBS += -lz -lselinux
+ COMPRESSORS += gzip
+ endif
