@@ -1,0 +1,44 @@
+Index: ean/main.c
+===================================================================
+--- ean.orig/main.c
++++ ean/main.c
+@@ -557,8 +557,10 @@ int main
+     }
+   }
+
++#if 0
+   if (user_check && getuid() != 0)
+     LOG_FATAL("Not superuser");
++#endif
+
+   /* Initialise reusable file descriptors before fork */
+   SCK_PreInitialise();
+@@ -603,8 +605,10 @@ int main
+     user = CNF_GetUser();
+
+   pw = getpwnam(user);
++#if 0
+   if (!pw)
+     LOG_FATAL("Could not get user/group ID of %s", user);
++#endif
+
+   /* Create directories for sockets, log files, and dump files */
+   CNF_CreateDirs(pw->pw_uid, pw->pw_gid);
+@@ -644,13 +648,16 @@ int main
+     SYS_LockMemory();
+   }
+
++#if 0
+   /* Drop root privileges if the specified user has a non-zero UID */
+   if (!geteuid() && (pw->pw_uid || pw->pw_gid)) {
+     SYS_DropRoot(pw->pw_uid, pw->pw_gid, SYS_MAIN_PROCESS);
+-
++#endif
+     /* Warn if missing read access or having write access to keys */
+     CNF_CheckReadOnlyAccess();
++#if 0
+   }
++#endif
+
+   if (!geteuid())
+     LOG(LOGS_WARN, "Running with root privileges");
