@@ -1,0 +1,13 @@
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 266657f..7db5c16 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -74,6 +74,8 @@
+ #include <sys/sem.h>
+ #include <sys/shm.h>
+ #endif
++#define ENABLE_FEATURE_SYSLOGD_CFG 1
++#define ENABLE_FEATURE_ROTATE_LOGFILE 1
+ 
+ 
+ #define DEBUG 0
