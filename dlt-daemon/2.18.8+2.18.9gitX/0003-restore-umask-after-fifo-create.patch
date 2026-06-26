@@ -1,0 +1,23 @@
+diff --git a/src/daemon/dlt-daemon.c b/src/daemon/dlt-daemon.c
+index 3f7d0ad..99d2c0a 100644
+--- a/src/daemon/dlt-daemon.c
++++ b/src/daemon/dlt-daemon.c
+@@ -1952,14 +1952,16 @@ static int dlt_daemon_init_fifo(DltDaemonLocal *daemon_local)
+     int ret;
+     int fd = -1;
+     int fifo_size;
++    mode_t old_umask;
+ 
+     /* open named pipe(FIFO) to receive DLT messages from users */
+-    umask(0);
++    old_umask = umask(0);
+ 
+     /* Try to delete existing pipe, ignore result of unlink */
+     const char *tmpFifo = daemon_local->flags.daemonFifoName;
+     unlink(tmpFifo);
+ 
+     ret = mkfifo(tmpFifo, S_IRUSR | S_IWUSR | S_IWGRP);
++    umask(old_umask);
+ 
+     if (ret == -1) {
+         dlt_vlog(LOG_WARNING, "FIFO user %s cannot be created (%s)!\n",
