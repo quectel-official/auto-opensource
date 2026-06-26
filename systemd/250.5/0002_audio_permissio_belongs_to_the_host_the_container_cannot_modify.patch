@@ -1,0 +1,14 @@
+diff --git a/rules.d/50-udev-default.rules.in b/rules.d/50-udev-default.rules.in
+index 8fae58f115..0a9592c67c 100644
+--- a/rules.d/50-udev-default.rules.in
++++ b/rules.d/50-udev-default.rules.in
+@@ -44,9 +42,6 @@ SUBSYSTEM=="misc", KERNEL=="sgx_vepc", GROUP="sgx", MODE="0660"
+ # When using static_node= with non-default permissions, also update
+ # tmpfiles.d/static-nodes-permissions.conf.in to keep permissions synchronized.
+ 
+-SUBSYSTEM=="sound", GROUP="audio", \
+-  OPTIONS+="static_node=snd/seq", OPTIONS+="static_node=snd/timer"
+-
+ SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", MODE="0664"
+ 
+ SUBSYSTEM=="firewire", TEST=="units", TEST=="model", \
