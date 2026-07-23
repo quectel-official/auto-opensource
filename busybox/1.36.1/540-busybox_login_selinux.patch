@@ -1,0 +1,11 @@
+--- a/loginutils/login.c	2021-11-24 21:27:33.000000000 +0800
++++ b/loginutils/login.c	2022-06-22 16:35:09.827929158 +0800
+@@ -541,7 +541,7 @@
+ 	}
+ #endif
+ 
+-	IF_SELINUX(initselinux(username, full_tty, &user_sid);)
++	//IF_SELINUX(initselinux(username, full_tty, &user_sid);)
+ 
+ 	/* Try these, but don't complain if they fail.
+ 	 * _f_chown is safe wrt race t=ttyname(0);...;chown(t); */

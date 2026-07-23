@@ -1,0 +1,37 @@
+--- a/loginutils/login.c	2024-12-30 17:08:32.141433585 +0800
++++ b/loginutils/login.c	2024-12-30 17:52:19.914475360 +0800
+@@ -143,6 +143,26 @@
+ #define G (*(struct globals*)bb_common_bufsiz1)
+ #define INIT_G() do { setup_common_bufsiz(); } while (0)
+ 
++void log_failure(const char *user, const char *host) {
++    struct utmp ut = {0};
++    // 登录失败记录的填充
++    ut.ut_type = EMPTY;
++    strncpy(ut.ut_user, user, sizeof(ut.ut_user));
++    strncpy(ut.ut_host, host, sizeof(ut.ut_host));
++    gettimeofday(&ut.ut_tv, NULL);
++
++    // 打开btmp文件
++    int fd = open("/var/log/btmp", O_WRONLY | O_APPEND);
++    if (fd < 0) {
++        // 错误处理
++        return;
++    }
++
++    // 写入btmp
++    write(fd, &ut, sizeof(ut));
++
++    close(fd);
++}
+ 
+ #if ENABLE_FEATURE_NOLOGIN
+ static void die_if_nologin(void)
+@@ -515,6 +535,7 @@
+ 		pause_after_failed_login();
+ 		/* TODO: doesn't sound like correct English phrase to me */
+ 		puts("Login incorrect");
++		log_failure(record_login_name,short_tty);
+ 		syslog(LOG_INFO, "FAILED LOGIN %s FOR '%s'",fromhost,record_login_name);
+ 		syslog(LOG_WARNING, "invalid password for '%s'%s",
+ 					record_login_name, fromhost);

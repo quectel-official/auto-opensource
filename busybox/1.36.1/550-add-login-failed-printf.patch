@@ -1,0 +1,40 @@
+--- a/loginutils/login.c	2024-12-23 17:06:15.282771472 +0800
++++ b/loginutils/login.c	2024-12-23 17:06:08.986649196 +0800
+@@ -339,6 +339,7 @@
+ 	struct passwd pwdstruct;
+ 	char pwdbuf[256];
+ 	char **pamenv;
++	char record_login_name[64] = {0};
+ #endif
+ #if ENABLE_LOGIN_SESSION_AS_CHILD
+ 	pid_t child_pid;
+@@ -406,7 +407,8 @@
+ 
+ 		if (!username[0])
+ 			get_username_or_die(username, sizeof(username));
+-
++		memset(record_login_name,0,64);
++		snprintf(record_login_name,64,"%s",username);
+ #if ENABLE_PAM
+ 		pamret = pam_start("login", username, &conv, &pamh);
+ 		if (pamret != PAM_SUCCESS) {
+@@ -513,8 +515,9 @@
+ 		pause_after_failed_login();
+ 		/* TODO: doesn't sound like correct English phrase to me */
+ 		puts("Login incorrect");
++		syslog(LOG_INFO, "FAILED LOGIN %s FOR '%s'",fromhost,record_login_name);
+ 		syslog(LOG_WARNING, "invalid password for '%s'%s",
+-					username, fromhost);
++					record_login_name, fromhost);
+ 		if (++count == 3) {
+ 			if (ENABLE_FEATURE_CLEAN_UP)
+ 				free(fromhost);
+@@ -576,7 +579,7 @@
+ 		motd();
+ 
+ 	if (pw->pw_uid == 0)
+-		syslog(LOG_INFO, "root login%s", fromhost);
++		syslog(LOG_INFO, "ROOT LOGIN%s", fromhost);
+ 
+ 	if (ENABLE_FEATURE_CLEAN_UP)
+ 		free(fromhost);
