@@ -1,0 +1,15 @@
+Upstream-Status: Pending
+diff --git a/src/core/mount.c b/src/core/mount.c
+index c650b5a..888483a 100644
+--- a/src/core/mount.c
++++ b/src/core/mount.c
+@@ -375,6 +375,9 @@ static int mount_add_device_dependencies(Mount *m) {
+         if (path_equal(m->where, "/"))
+                 return 0;
+ 
++        if (path_equal(m->where, "/cache") || path_equal(m->where, "/persist") || path_equal(m->where, "/data") || path_equal(m->where, "/systemrw"))
++                return 0;
++
+         /* Mount units from /proc/self/mountinfo are not bound to devices by default since they're subject to
+          * races when mounts are established by other tools with different backing devices than what we
+          * maintain. The user can still force this to be a BindsTo= dependency with an appropriate option (or
