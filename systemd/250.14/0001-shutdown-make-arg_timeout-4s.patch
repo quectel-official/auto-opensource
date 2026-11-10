@@ -1,1 +1,12 @@
+--- a/src/shutdown/shutdown.c	2023-05-09 15:07:34.859131250 +0800
++++ b/src/shutdown/shutdown.c	2023-05-09 15:08:29.530377143 +0800
+@@ -374,6 +374,8 @@ int main(int argc, char *argv[]) {
+ 
+         disable_coredumps();
+ 
++	/* Make it 4 seconds */
++        arg_timeout = (4 * USEC_PER_SEC);
+         log_info("Sending SIGTERM to remaining processes...");
+         broadcast_signal(SIGTERM, true, true, arg_timeout);
+ 
 
