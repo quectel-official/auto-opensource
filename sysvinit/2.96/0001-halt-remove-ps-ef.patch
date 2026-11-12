@@ -1,1 +1,13 @@
-
+diff --git sysvinit-2.96/src/halt.c sysvinit-2.96/src/halt.c
+index 581b653..f649ae2 100644
+--- sysvinit-2.96/src/halt.c
++++ sysvinit-2.96/src/halt.c
+@@ -199,7 +199,7 @@ int main(int argc, char **argv)
+ 
+ 	openlog("halt", LOG_PID, LOG_USER);
+ 	syslog(LOG_NOTICE, "cmd form comm pid:%d, ppid:%d", getpid(), getppid());
+-	system("ps -ef | logger");
++	system("ps | logger");
+ 	closelog();
+ 
+ 	/*

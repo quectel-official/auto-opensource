@@ -1,0 +1,13 @@
+diff --git sysvinit-2.96/src/shutdown.c sysvinit-2.96/src/shutdown.c
+index 6cdd618..f54d6e9 100644
+--- sysvinit-2.96/src/shutdown.c
++++ sysvinit-2.96/src/shutdown.c
+@@ -545,7 +545,7 @@ int main(int argc, char **argv)
+ 
+ 	openlog("shutdown", LOG_PID, LOG_USER);
+ 	syslog(LOG_NOTICE, "cmd form comm pid:%d, ppid:%d", getpid(), getppid());
+-	system("ps -ef | logger");
++	system("ps | logger");
+ 	closelog();
+ 
+ 	if (getuid() != 0) {
