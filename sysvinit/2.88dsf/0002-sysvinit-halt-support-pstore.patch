@@ -1,1 +1,184 @@
-
+diff -Naur a/src/halt.c b/src/halt.c
+--- a/src/halt.c	2010-02-26 21:45:49.000000000 +0800
++++ b/src/halt.c	2024-11-26 10:27:29.358944261 +0800
+@@ -56,6 +56,9 @@
+ #include <signal.h>
+ #include <stdio.h>
+ #include <getopt.h>
++#include <errno.h>
++#include <stdarg.h>
++#include <log/log.h>
+ #include "reboot.h"
+ 
+ char *Version = "@(#)halt  2.86  31-Jul-2004 miquels@cistron.nl";
+@@ -69,6 +72,79 @@
+ extern int hdflush(void);
+ extern void write_wtmp(char *user, char *id, int pid, int type, char *line);
+ 
++#define WICOM_DEBUG_LOG(...) __android_log_print(ANDROID_LOG_DEBUG, "wicom_powerapp", ##__VA_ARGS__)
++static int wicom_to_pstore(char *logmsg)
++{
++    FILE *pfile;
++
++    if (access("/dev/pmsg0", W_OK) !=0 )
++    {
++        WICOM_DEBUG_LOG("'/dev/pmsg0' does not exist. Please enable the pstore function\n");
++        return -EIO;
++    }
++
++    pfile = fopen("/dev/pmsg0", "wa+");
++    if (NULL == pfile)
++    {
++        fprintf(stderr, "pstore function is not enabled\n");
++        WICOM_DEBUG_LOG("write pstore error\n");
++        return -EFAULT;
++    }
++
++    fputs(logmsg, pfile);
++
++    fclose(pfile);
++
++    return 0;
++}
++
++static void wicom_printf_each_process(pid_t pid)
++{
++    char path[256], str[2048], name[256];
++    pid_t ppid, cpid;
++    FILE *pfile;
++
++    memset(path, '\0', sizeof(path));
++    snprintf(path, 255, "/proc/%d/stat", pid);
++    pfile = fopen(path, "r");
++    if (!pfile)
++    {
++        return ;
++    }
++
++    memset(str, '\0', sizeof(str));
++    fgets(str, sizeof(str), pfile);
++    fclose(pfile);
++
++    memset(name, '\0', sizeof(name));
++    sscanf(str, "%u %*c%s %*c %u %*s", &cpid, name, &ppid);
++    if(strlen(name) != 0)
++    name[strlen(name) - 1] = '\0';
++
++    memset(str, '\0', sizeof(str));
++    snprintf(str, 2047, "Call Process '%s' (pid: %d) \n", name, cpid);
++    wicom_to_pstore(str);
++    WICOM_DEBUG_LOG("%s", str);
++
++    wicom_printf_each_process(ppid);
++}
++
++static void wicom_printf(const char *msg, char *fmt, ...)
++{
++    char str[512], msgstr[1024];
++    va_list args;
++
++    va_start(args, fmt);
++    vsprintf(str, fmt, args);
++    va_end(args);
++
++    snprintf(msgstr, 1023, "Application : Trigger '%s' %s", msg, str);
++    wicom_to_pstore(msgstr);
++    WICOM_DEBUG_LOG("%s\n", msgstr);
++
++    wicom_printf_each_process(getpid());
++}
++
+ /*
+  *	Send usage message.
+  */
+@@ -184,6 +260,8 @@
+ 	int do_poweroff = 0;
+ 	int c;
+ 	char *tm = NULL;
++    struct tm t;
++    time_t sec;
+ 
+ 	/*
+ 	 *	Find out who we are
+@@ -245,8 +323,12 @@
+ 		/*
+ 		 *	See if we are in runlevel 0 or 6.
+ 		 */
++        time(&sec);
++        localtime_r(&sec, &t);
+ 		c = get_runlevel();
+ 		if (c != '0' && c != '6')
++            wicom_printf("do_shutdown", "%04d-%02d-%02d %02d:%02d:%02d\n",
++                    t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
+ 			do_shutdown(do_reboot ? "-r" : "-h", tm);
+ 	}
+ 
+@@ -277,12 +359,22 @@
+ 	if (do_nothing) exit(0);
+ 
+ 	if (do_reboot) {
++        time(&sec);
++        localtime_r(&sec, &t);
++
++        wicom_printf("do_reboot", "%04d-%02d-%02d %02d:%02d:%02d\n",
++                t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
+ 		init_reboot(BMAGIC_REBOOT);
+ 	} else {
+ 		/*
+ 		 *	Turn on hard reboot, CTRL-ALT-DEL will reboot now
+ 		 */
+ #ifdef BMAGIC_HARD
++        time(&sec);
++        localtime_r(&sec, &t);
++
++        wicom_printf("hard_reboot", "%04d-%02d-%02d %02d:%02d:%02d\n",
++                t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
+ 		init_reboot(BMAGIC_HARD);
+ #endif
+ 
+@@ -296,10 +388,22 @@
+ 		 *	Halt or poweroff.
+ 		 */
+ 		if (do_poweroff)
++        {
++            time(&sec);
++            localtime_r(&sec, &t);
++
++            wicom_printf("do_poweroff", "%04d-%02d-%02d %02d:%02d:%02d\n",
++                    t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
+ 			init_reboot(BMAGIC_POWEROFF);
++        }
+ 		/*
+ 		 *	Fallthrough if failed.
+ 		 */
++        time(&sec);
++        localtime_r(&sec, &t);
++
++        wicom_printf("halt_reboot", "%04d-%02d-%02d %02d:%02d:%02d\n",
++                t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
+ 		init_reboot(BMAGIC_HALT);
+ 	}
+ 
+@@ -307,6 +411,11 @@
+ 	 *	If we return, we (c)ontinued from the kernel monitor.
+ 	 */
+ #ifdef BMAGIC_SOFT
++    time(&sec);
++    localtime_r(&sec, &t);
++
++    wicom_printf("soft_reboot", "%04d-%02d-%02d %02d:%02d:%02d\n",
++            t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
+ 	init_reboot(BMAGIC_SOFT);
+ #endif
+ 	kill(1, SIGCONT);
+diff -Naur a/src/Makefile b/src/Makefile
+--- a/src/Makefile	2024-11-12 13:56:25.000000000 +0800
++++ b/src/Makefile	2024-11-25 19:57:29.968694300 +0800
+@@ -103,6 +103,7 @@
+ init:		LDLIBS += $(INITLIBS) $(STATIC)
+ init:		init.o init_utmp.o
+ 
++halt:	    LDLIBS += -llog
+ halt:		halt.o ifdown.o hddown.o utmp.o
+ 
+ last:		last.o
